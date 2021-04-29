@@ -408,7 +408,7 @@ class Decoder(torch.nn.Module):
 
         super(Decoder, self).__init__()
         self.multihead_attn_self = MultiHead_Attn(n_heads, emb_dim, qk_dim, v_dim, dropout)
-        #self.multihead_attn_enc_src = MultiHead_Attn(n_heads, emb_dim, qk_dim, v_dim, dropout)
+        self.multihead_attn_enc_src2 = MultiHead_Attn(n_heads, emb_dim, qk_dim, v_dim, dropout)
         self.multihead_attn_enc_src = MultiHead_Attn_RELU(n_heads, emb_dim, qk_dim, v_dim, dropout)
         #self.multihead_attn_enc_pre = MultiHead_Attn(n_heads, emb_dim, qk_dim, v_dim, dropout)
         self.multihead_attn_enc_pre = MultiHead_Attn_RELU(n_heads, emb_dim, qk_dim, v_dim, dropout)
@@ -416,6 +416,7 @@ class Decoder(torch.nn.Module):
         self.norm_att_self = torch.nn.LayerNorm(emb_dim, eps=1e-6)
         self.norm_att_enc_src = torch.nn.LayerNorm(emb_dim, eps=1e-6)
         self.norm_att_enc_pre = torch.nn.LayerNorm(emb_dim, eps=1e-6)
+        self.norm_att_enc_src2 = torch.nn.LayerNorm(emb_dim, eps=1e-6)
         self.norm_ff = torch.nn.LayerNorm(emb_dim, eps=1e-6)
 
 
@@ -455,6 +456,17 @@ class Decoder(torch.nn.Module):
         z_src, z_pre = dp_src(z_src), dp_pre(z_pre)
 
         tmp = tmp + z_src + z_pre
+
+
+        ################## ici on rajoute un cross attn avec src ###################################
+        # NORM
+        tmp1 = self.norm_att_enc_src2(tmp)
+        ################################# CROSS ATTN 2 #####################################################
+        # ATTN over src words : q are words from the previous layer, k, v are src words
+        tmp3 = self.multihead_attn_enc_src2(q=tmp1, k=z_src, v=z_src, msk=msk_src)  # la query reste tmp1 car tmp1 est la variable en sortie du précédent layer
+        # ADD
+        tmp = tmp3 + tmp
+
         # NORM
         tmp1 = self.norm_ff(tmp)
         # FF
